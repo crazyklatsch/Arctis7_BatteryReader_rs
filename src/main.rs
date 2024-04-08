@@ -4,14 +4,13 @@
 
 #![windows_subsystem = "windows"]
 
-use std::{borrow::BorrowMut, cell::RefCell, ops::DerefMut, process::exit, rc::Rc, sync::atomic::AtomicBool, time::Duration};
+use std::{process::exit, time::Duration};
 
 use tray_icon::{
-    menu::{AboutMetadata, IconMenuItem, IconMenuItemBuilder, Menu, MenuEvent, MenuItem, MenuItemBuilder, PredefinedMenuItem, SubmenuBuilder}, TrayIcon, TrayIconBuilder, TrayIconEvent
+    menu::{Menu, MenuEvent, MenuItem, MenuItemBuilder}, TrayIcon, TrayIconBuilder
 };
 use winit::event_loop::{ControlFlow, EventLoopBuilder};
 
-use std::sync::{atomic::AtomicU8, Arc};
 use std::{convert::TryInto, path::Path};
 
 
