@@ -30,7 +30,7 @@ struct Device<'a> {
     pid: u16,
 }
 
-const STEELSERIES_DEVICES: [Device; 5] = [
+const STEELSERIES_DEVICES: [Device; 6] = [
     Device {
         name: "Arctis 7 (2019)",
         vid: 0x1038,
@@ -55,6 +55,11 @@ const STEELSERIES_DEVICES: [Device; 5] = [
         name: "Arctis 9",
         vid: 0x1038,
         pid: 0x12c2,
+    },
+    Device {
+        name: "Arctis Nova 7",
+        vid: 0x1038,
+        pid: 0x2202,
     },
 ];
 
