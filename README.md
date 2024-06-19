@@ -24,4 +24,4 @@ then copy the "\<repo-dir\>/target/release/arctis7-batteryreader-rs.exe" file an
 
 # Install (Windows)
 Download and execute the "Arctis7_BatteryReader_Installer.msi" from the latest release.
-It is a default install wizard that will copy the .exe and the icons to the selected program folder and add the program to autostart.
+It is a default install wizard that will copy the .exe and the icons to the selected program folder and add the program to autostart. The program can be removed using the regular Windows "Add or Remove programms" settings.

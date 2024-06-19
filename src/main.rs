@@ -4,15 +4,15 @@
 
 #![windows_subsystem = "windows"]
 
-use std::{process::exit, time::Duration};
+use std::{process::exit, time::Duration, usize};
 
 use tray_icon::{
-    menu::{Menu, MenuEvent, MenuItem, MenuItemBuilder}, TrayIcon, TrayIconBuilder
+    menu::{Menu, MenuEvent, MenuItemBuilder},
+    TrayIconBuilder,
 };
 use winit::event_loop::{ControlFlow, EventLoopBuilder};
 
 use std::{convert::TryInto, path::Path};
-
 
 use hidapi::HidApi;
 
@@ -21,14 +21,51 @@ const READ_TIMEOUT_MS: i32 = 100;
 const READ_BUFFER_SIZE: usize = 32;
 
 const REPORT_ID: u8 = 0x06;
-const ARCTIS7_VID: u16 = 0x1038;
-const ARCTIS7_PID: u16 = 0x12ad;
-const ARCTIS7_ADDRESS_BATTERY: u8 = 0x18; // -> 0-100 in %
-const _ARCTIS7_ADDRESS_MUTE_STATUS: u8 = 0x30; // -> 0 not muted, 1 muted
+const ADDRESS_BATTERY: u8 = 0x18; // -> 0-100 in %
+const _ADDRESS_MUTE_STATUS: u8 = 0x30; // -> 0 not muted, 1 muted
 
-const ARCTIS7_BATTERY_REQUEST: [u8; 32] = [
+struct Device<'a> {
+    name: &'a str,
+    vid: u16,
+    pid: u16,
+}
+
+const STEELSERIES_DEVICES: [Device; 6] = [
+    Device {
+        name: "Arctis 7 (2019)",
+        vid: 0x1038,
+        pid: 0x12ad,
+    },
+    Device {
+        name: "Arctis 7 (2017)",
+        vid: 0x1038,
+        pid: 0x1260,
+    },
+    Device {
+        name: "Arctis Pro",
+        vid: 0x1038,
+        pid: 0x1252,
+    },
+    Device {
+        name: "Arctis 1 Wireless",
+        vid: 0x1038,
+        pid: 0x12b3,
+    },
+    Device {
+        name: "Arctis 9",
+        vid: 0x1038,
+        pid: 0x12c2,
+    },
+    Device {
+        name: "Arctis Nova 7",
+        vid: 0x1038,
+        pid: 0x2202,
+    },
+];
+
+const BATTERY_REQUEST: [u8; 32] = [
     REPORT_ID,
-    ARCTIS7_ADDRESS_BATTERY,
+    ADDRESS_BATTERY,
     0,
     0,
     0,
@@ -74,49 +111,67 @@ fn main() {
     let _ = menu.append(&item_quit);
 
     let tray_icon = TrayIconBuilder::new()
-    .with_menu(Box::new(menu.clone()))
-    .with_tooltip("Arctis7 battery reader")
-    .with_icon(icons[0].clone())
-    .with_title("x")
-    .build()
-    .unwrap();
+        .with_menu(Box::new(menu.clone()))
+        .with_tooltip("Steelseries battery reader")
+        .with_icon(icons[0].clone())
+        .with_title("x")
+        .build()
+        .unwrap();
 
     let _ = event_loop.run(move |event, event_loop| {
-        event_loop.set_control_flow(ControlFlow::wait_duration(Duration::from_secs(READ_INTERVAL_SEC)));
+        event_loop.set_control_flow(ControlFlow::wait_duration(Duration::from_secs(
+            READ_INTERVAL_SEC,
+        )));
 
-        if let winit::event::Event::NewEvents(winit::event::StartCause::ResumeTimeReached { start, requested_resume }) = event {
-            let battery_percent: usize = read_arctis7_battery().into();
-            let _ = tray_icon.set_icon(Some(icons[battery_percent.clamp(0, 100)].clone()));
+        let mut update_required = false;
+
+        if let winit::event::Event::NewEvents(winit::event::StartCause::ResumeTimeReached {
+            start,
+            requested_resume,
+        }) = event
+        {
+            update_required = true;
         }
 
         if let Ok(event) = menu_channel.try_recv() {
             if event.id() == item_refresh.id() {
-                let battery_percent: usize = read_arctis7_battery().into();
-                let _ = tray_icon.set_icon(Some(icons[battery_percent.clamp(0, 100)].clone()));
-            }
-            else if event.id() == item_quit.id() {
+                update_required = true;
+            } else if event.id() == item_quit.id() {
                 exit(0);
             }
+        }
+
+        if update_required {
+            let (battery_percent, name) = read_battery();
+            let _ = tray_icon.set_icon(Some(
+                icons[Into::<usize>::into(battery_percent).clamp(0, 100)].clone(),
+            ));
+            let _ = tray_icon.set_tooltip(Some(format!("{} battery reader", name)));
         }
     });
 }
 
-/// Reads the current battery percent of the first responding hid device with arctis7 vid and pid.
-/// If no responding arctis7 device is found, 0 is returned.
-fn read_arctis7_battery() -> u8 {
+/// Reads the current battery percent of the first responding hid device with a valid vid and pid.
+/// If no responding device is found, 0 is returned.
+fn read_battery() -> (u8, &'static str) {
     match HidApi::new() {
         Ok(api) => {
             for device in api.device_list() {
-                if device.vendor_id() == ARCTIS7_VID && device.product_id() == ARCTIS7_PID {
-                    if let Ok(dev) = device.open_device(&api) {
-                        let _ = dev.write(&ARCTIS7_BATTERY_REQUEST);
-                        let mut buffer: [u8; READ_BUFFER_SIZE] = [0; READ_BUFFER_SIZE];
-                        if let Ok(numbytesread) = dev.read_timeout(&mut buffer, READ_TIMEOUT_MS) {
-                            if numbytesread >= 3
-                                && buffer[0] == REPORT_ID
-                                && buffer[1] == ARCTIS7_ADDRESS_BATTERY
+                for known_device in STEELSERIES_DEVICES {
+                    if device.vendor_id() == known_device.vid
+                        && device.product_id() == known_device.pid
+                    {
+                        if let Ok(dev) = device.open_device(&api) {
+                            let _ = dev.write(&BATTERY_REQUEST);
+                            let mut buffer: [u8; READ_BUFFER_SIZE] = [0; READ_BUFFER_SIZE];
+                            if let Ok(numbytesread) = dev.read_timeout(&mut buffer, READ_TIMEOUT_MS)
                             {
-                                return buffer[2];
+                                if numbytesread >= 3
+                                    && buffer[0] == REPORT_ID
+                                    && buffer[1] == ADDRESS_BATTERY
+                                {
+                                    return (buffer[2], known_device.name);
+                                }
                             }
                         }
                     }
@@ -127,7 +182,7 @@ fn read_arctis7_battery() -> u8 {
             eprintln!("Error: {}", e);
         }
     }
-    0
+    (0, "")
 }
 
 fn load_icon(path: &std::path::Path) -> tray_icon::Icon {
@@ -160,4 +215,3 @@ fn load_icons() -> [tray_icon::Icon; 100] {
         panic!("Expected a Vec of length {} but it was {}", 100, v.len())
     });
 }
-
