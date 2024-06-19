@@ -170,7 +170,11 @@ fn read_battery() -> (u8, &'static str) {
                                     && buffer[0] == REPORT_ID
                                     && buffer[1] == ADDRESS_BATTERY
                                 {
-                                    return (buffer[2], known_device.name);
+                                    if buffer[2] <= 100 {
+                                        return (buffer[2], known_device.name);
+                                    } else {
+                                        return (0, known_device.name);
+                                    }
                                 }
                             }
                         }
