@@ -4,6 +4,7 @@
 
 #![windows_subsystem = "windows"]
 
+use core::fmt;
 use std::{process::exit, time::Duration, usize};
 
 use tray_icon::{
@@ -16,87 +17,11 @@ use std::{convert::TryInto, path::Path};
 
 use hidapi::HidApi;
 
+mod known_devices;
+use crate::known_devices::*;
+
 const READ_INTERVAL_SEC: u64 = 2;
 const READ_TIMEOUT_MS: i32 = 100;
-const READ_BUFFER_SIZE: usize = 32;
-
-const REPORT_ID: u8 = 0x06;
-const ADDRESS_BATTERY: u8 = 0x18; // -> 0-100 in %
-const _ADDRESS_MUTE_STATUS: u8 = 0x30; // -> 0 not muted, 1 muted
-
-struct Device<'a> {
-    name: &'a str,
-    vid: u16,
-    pid: u16,
-}
-
-const STEELSERIES_DEVICES: [Device; 6] = [
-    Device {
-        name: "Arctis 7 (2019)",
-        vid: 0x1038,
-        pid: 0x12ad,
-    },
-    Device {
-        name: "Arctis 7 (2017)",
-        vid: 0x1038,
-        pid: 0x1260,
-    },
-    Device {
-        name: "Arctis Pro",
-        vid: 0x1038,
-        pid: 0x1252,
-    },
-    Device {
-        name: "Arctis 1 Wireless",
-        vid: 0x1038,
-        pid: 0x12b3,
-    },
-    Device {
-        name: "Arctis 9",
-        vid: 0x1038,
-        pid: 0x12c2,
-    },
-    Device {
-        name: "Arctis Nova 7",
-        vid: 0x1038,
-        pid: 0x2202,
-    },
-];
-
-const BATTERY_REQUEST: [u8; 32] = [
-    REPORT_ID,
-    ADDRESS_BATTERY,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-];
 
 fn main() {
     let icons = load_icons();
@@ -146,7 +71,7 @@ fn main() {
             let _ = tray_icon.set_icon(Some(
                 icons[Into::<usize>::into(battery_percent).clamp(0, 100)].clone(),
             ));
-            let _ = tray_icon.set_tooltip(Some(format!("{} battery reader", name)));
+            let _ = tray_icon.set_tooltip(Some(format!("{}", name)));
         }
     });
 }
@@ -157,36 +82,33 @@ fn read_battery() -> (u8, &'static str) {
     match HidApi::new() {
         Ok(api) => {
             for device in api.device_list() {
-                for known_device in STEELSERIES_DEVICES {
-                    if device.vendor_id() == known_device.vid
-                        && device.product_id() == known_device.pid
-                    {
-                        if let Ok(dev) = device.open_device(&api) {
-                            let _ = dev.write(&BATTERY_REQUEST);
-                            let mut buffer: [u8; READ_BUFFER_SIZE] = [0; READ_BUFFER_SIZE];
-                            if let Ok(numbytesread) = dev.read_timeout(&mut buffer, READ_TIMEOUT_MS)
-                            {
-                                if numbytesread >= 3
-                                    && buffer[0] == REPORT_ID
-                                    && buffer[1] == ADDRESS_BATTERY
+                if device.vendor_id() == STEELSERIES_VID {
+                    for known_device in ARCTIS_DEVICES {
+                        if device.product_id() == known_device.pid.into()
+                        {
+                            if let Ok(dev) = device.open_device(&api) {
+                                let _ = dev.write(&known_device.generate_request());
+                                let mut buffer: [u8; REPORT_BUFFER_SIZE] = [0; REPORT_BUFFER_SIZE];
+                                if let Ok(numbytesread) = dev.read_timeout(&mut buffer, READ_TIMEOUT_MS)
                                 {
-                                    if buffer[2] <= 100 {
-                                        return (buffer[2], known_device.name);
-                                    } else {
-                                        return (0, known_device.name);
+                                    if numbytesread >= known_device.idx_battery.into()
+                                    {
+                                        return (known_device.read_battery_percent(&buffer).clamp(0, 100), known_device.name)
                                     }
                                 }
                             }
+                            break;
                         }
                     }
                 }
+                
             }
         }
         Err(e) => {
-            eprintln!("Error: {}", e);
+            return (0, "Error in HidApi")
         }
     }
-    (0, "")
+    (0, "No headset found")
 }
 
 fn load_icon(path: &std::path::Path) -> tray_icon::Icon {
