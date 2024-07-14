@@ -4,7 +4,6 @@
 
 #![windows_subsystem = "windows"]
 
-use core::fmt;
 use std::{process::exit, time::Duration, usize};
 
 use tray_icon::{
@@ -50,6 +49,7 @@ fn main() {
 
         let mut update_required = false;
 
+        #[allow(unused_variables)]
         if let winit::event::Event::NewEvents(winit::event::StartCause::ResumeTimeReached {
             start,
             requested_resume,
@@ -104,7 +104,7 @@ fn read_battery() -> (u8, &'static str) {
                 
             }
         }
-        Err(e) => {
+        Err(_e) => {
             return (0, "Error in HidApi")
         }
     }

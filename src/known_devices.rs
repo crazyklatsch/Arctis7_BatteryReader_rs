@@ -1,10 +1,11 @@
-use std::ops::{Div, Mul, Sub};
+use std::ops::{Div, Sub};
 
 pub const STEELSERIES_VID: u16 = 0x1038;
 
 pub const REQUEST_BUFFER_SIZE: usize = 32;
 pub const REPORT_BUFFER_SIZE: usize = 32;
 
+#[allow(non_camel_case_types)]
 #[derive(Debug, Copy, Clone)]
 pub enum ArctisPID {
     Arctis7_2019,
