@@ -123,11 +123,11 @@ fn load_icon(path: &std::path::Path) -> tray_icon::Icon {
     tray_icon::Icon::from_rgba(icon_rgba, icon_width, icon_height).expect("Failed to open icon")
 }
 
-fn load_icons() -> [tray_icon::Icon; 100] {
+fn load_icons() -> [tray_icon::Icon; 101] {
     let mut icons: Vec<tray_icon::Icon> = Vec::new();
-    icons.reserve_exact(100);
+    icons.reserve_exact(101);
 
-    for i in 0..100 {
+    for i in 0..101 {
         let location = format!(
             ".\\headset_battery_icons\\pngs\\{}.png",
             //env!("CARGO_MANIFEST_DIR"),
@@ -138,6 +138,6 @@ fn load_icons() -> [tray_icon::Icon; 100] {
     }
 
     return icons.try_into().unwrap_or_else(|v: Vec<tray_icon::Icon>| {
-        panic!("Expected a Vec of length {} but it was {}", 100, v.len())
+        panic!("Expected a Vec of length {} but it was {}", 101, v.len())
     });
 }
