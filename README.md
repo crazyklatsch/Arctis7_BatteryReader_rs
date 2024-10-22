@@ -20,7 +20,7 @@ Headset connected:
 I cannot test the program for any headsets except for the Arctis 7 (2019). Any feedback on working/not working devices from the list is welcome.
 
 - Arctis 7 (2019) <span style="color:green"> -> tested</span>
-- Arctis 7 (2017) <span style="color:red">  -> not tested</span>
+- Arctis 7 (2017) <span style="color:red">  -> tested</span>
 - Arctis Pro Wireless <span style="color:red">  -> not tested</span>
 - Arctis Pro (2019) <span style="color:red">  -> not tested</span>
 - Arctis Pro GameDac <span style="color:red">  -> not tested</span>
